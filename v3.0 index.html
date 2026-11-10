@@ -1,0 +1,622 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Firework Lab V3</title>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#050713;color:white;font-family:Arial,sans-serif;overflow:hidden;height:100dvh}
+canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none}
+#top{
+ position:fixed;top:0;left:0;right:0;
+ padding:15px;display:flex;justify-content:space-between;
+ pointer-events:none;z-index:3;
+ background:linear-gradient(#050713aa,transparent)
+}
+.logo{font-weight:900;font-size:19px;letter-spacing:2px}
+.sub{font-size:10px;color:#a6b5ff;margin-top:4px}
+#stats{font-size:11px;color:#c5d1ff}
+#dock{
+ position:fixed;bottom:14px;left:12px;right:12px;
+ z-index:5;pointer-events:none;
+ display:flex;justify-content:space-between;align-items:end;
+}
+#menuButton,#zoomInfo{
+ pointer-events:auto;border:1px solid #6355ba;
+ background:#151b32ee;color:white;border-radius:13px;
+ padding:13px;font-weight:bold;font-size:12px;
+}
+#zoomInfo{border-color:#333e5c;color:#bbc7ee}
+#panel{
+ pointer-events:auto;position:fixed;z-index:6;
+ bottom:65px;left:12px;right:12px;
+ max-height:43dvh;overflow-y:auto;
+ background:rgba(10,14,31,.96);
+ border:1px solid #39466d;border-radius:17px;
+ padding:13px;backdrop-filter:blur(12px);
+ transition:opacity .2s,transform .2s;
+}
+#panel.closed{opacity:0;transform:translateY(20px);pointer-events:none}
+h3{font-size:10px;letter-spacing:2px;color:#a6b6ff;margin:12px 0 8px}
+h3:first-child{margin-top:0}
+.row{display:flex;gap:7px;flex-wrap:wrap}
+button,select{
+ color:white;background:#202943;border:1px solid #3a4768;
+ border-radius:9px;padding:10px;font-size:10px;font-weight:bold;
+}
+button.active{background:#6852df;border-color:#a69aff}
+button{cursor:pointer}
+.palette{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.preset{display:flex;align-items:center;gap:5px;text-align:left;font-size:9px}
+.swatches{display:flex}
+.swatches i{width:9px;height:19px;margin-right:2px;border-radius:3px}
+input[type=range]{width:100%;accent-color:#9279ff}
+.control{margin-top:12px}
+.control label{display:flex;justify-content:space-between;font-size:10px;margin-bottom:7px}
+.actions{display:flex;gap:7px;margin-top:13px}
+.actions button{flex:1}
+#launch{background:linear-gradient(110deg,#7955ff,#347bff);border:0}
+#custom{
+ display:flex;gap:7px;align-items:center;flex-wrap:wrap
+}
+#custom input[type=color]{width:35px;height:35px;border:0;background:none}
+#custom button{flex:1}
+@media(min-width:650px){
+ #panel{left:auto;width:380px;max-height:65dvh}
+ #dock{left:20px;right:20px}
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="sky"></canvas>
+
+<div id="top">
+ <div>
+  <div class="logo">FIREWORK LAB</div>
+  <div class="sub">V3.0 • INTERACTIVE SKY</div>
+ </div>
+ <div id="stats">BURSTS: 0</div>
+</div>
+
+<div id="dock">
+ <button id="menuButton">⚙ SETTINGS</button>
+ <div id="zoomInfo">ZOOM: 100%</div>
+</div>
+
+<div id="panel">
+
+<h3>VISUAL ENGINE</h3>
+<div class="row">
+ <button class="active" id="real">REALISTIC</button>
+ <button id="digital">PARTICLE</button>
+</div>
+
+<h3>COLOUR PRESETS</h3>
+<div class="palette" id="palettes"></div>
+
+<h3>BUILD YOUR GRADIENT</h3>
+<div id="custom">
+ <input type="color" id="c1" value="#25dfff">
+ <input type="color" id="c2" value="#555cff">
+ <input type="color" id="c3" value="#b65cff">
+ <input type="color" id="c4" value="#ffffff">
+ <button id="apply">APPLY GRADIENT</button>
+</div>
+<div class="row" style="margin-top:8px">
+ <button class="active" data-grad="2">2 COLOURS</button>
+ <button data-grad="3">3 COLOURS</button>
+ <button data-grad="4">4 COLOURS</button>
+</div>
+
+<h3>EXPLOSION SHAPE</h3>
+<div class="row" id="shapes">
+ <button class="active" data-shape="sphere">SPHERE</button>
+ <button data-shape="ring">RING</button>
+ <button data-shape="double">DOUBLE RING</button>
+ <button data-shape="star">STAR</button>
+ <button data-shape="spiral">SPIRAL</button>
+ <button data-shape="heart">HEART</button>
+ <button data-shape="chrysanthemum">CHRYSANTHEMUM</button>
+ <button data-shape="random">RANDOM</button>
+</div>
+
+<div class="control">
+ <label><span>EXPLOSION SIZE</span><span id="sv">70%</span></label>
+ <input id="size" type="range" min="30" max="100" value="70">
+</div>
+
+<div class="control">
+ <label><span>PARTICLES</span><span id="cv">180</span></label>
+ <input id="count" type="range" min="60" max="350" step="20" value="180">
+</div>
+
+<div class="control">
+ <label><span>GRAVITY</span><span id="gv">50%</span></label>
+ <input id="gravity" type="range" min="0" max="100" value="50">
+</div>
+
+<div class="actions">
+ <button id="launch">🚀 LAUNCH</button>
+ <button id="auto">AUTO: OFF</button>
+ <button id="clear">CLEAR</button>
+</div>
+
+</div>
+
+<script>
+const canvas=document.getElementById("sky");
+const ctx=canvas.getContext("2d",{alpha:false});
+
+let W,H,D;
+let particles=[];
+let rockets=[];
+let bursts=0;
+
+let mode="realistic";
+let shape="sphere";
+let size=.7;
+let amount=180;
+let gravity=.5;
+let auto=false;
+
+let colors=["#25dfff","#555cff","#b65cff","#ffffff"];
+let gradientCount=4;
+
+let camera={x:0,y:0,zoom:1};
+let pointers=new Map();
+let gesture=null;
+let moved=false;
+
+const MAX_PARTICLES=6500;
+const MAX_ROCKETS=8;
+
+function resize(){
+ D=Math.min(window.devicePixelRatio||1,1.25);
+ W=innerWidth;
+ H=innerHeight;
+ canvas.width=Math.round(W*D);
+ canvas.height=Math.round(H*D);
+ ctx.setTransform(D,0,0,D,0,0);
+}
+window.addEventListener("resize",resize);
+resize();
+
+const stars=Array.from({length:120},()=>({
+ x:Math.random()*W,
+ y:Math.random()*H,
+ r:Math.random()*1.3
+}));
+
+// Colour presets
+const presets=[
+ ["OCEAN",["#26dfff","#347cff","#a88cff","#ffffff"]],
+ ["SOLAR",["#ff332e","#ff8229","#ffd34d","#fff5c4"]],
+ ["GALAXY",["#ff53c8","#a34cff","#536aff","#31dcff"]],
+ ["EMERALD",["#21f59b","#20cbb9","#c6ff55","#ffffff"]],
+ ["ROYAL",["#6a42ff","#a55dff","#e8a5ff","#ffffff"]],
+ ["FIRE",["#ff241e","#ff671c","#ffb52e","#fff4a3"]],
+ ["ICE",["#ffffff","#a8efff","#54aaff","#526cff"]],
+ ["CANDY",["#ff69c9","#ff8c9c","#ffe28b","#a98aff"]],
+ ["TOXIC",["#b6ff00","#4cff5e","#00e8c2","#eaff8a"]],
+ ["RAINBOW",["#ff3737","#ffb52e","#f7f536","#38f77c","#39c9ff","#ae5cff"]],
+ ["GOLD",["#fff4b0","#ffcf45","#ff9d27","#fff8df"]],
+ ["MIDNIGHT",["#273cff","#5145a8","#a15cff","#e6b9ff"]]
+];
+
+const paletteBox=document.getElementById("palettes");
+
+presets.forEach(p=>{
+ const b=document.createElement("button");
+ b.className="preset";
+ b.innerHTML=`<span class="swatches">${p[1].slice(0,4).map(c=>`<i style="background:${c}"></i>`).join("")}</span>${p[0]}`;
+ b.onclick=()=>{
+  colors=p[1].slice();
+  document.querySelectorAll(".preset").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+ };
+ paletteBox.appendChild(b);
+});
+
+function worldPoint(sx,sy){
+ return {
+  x:(sx-camera.x)/camera.zoom,
+  y:(sy-camera.y)/camera.zoom
+ };
+}
+
+function randomColor(){
+ return colors[Math.floor(Math.random()*colors.length)];
+}
+
+function launch(x,y){
+ if(rockets.length>=MAX_ROCKETS)return;
+
+ const target=worldPoint(
+  x??W*(.2+Math.random()*.6),
+  y??H*(.18+Math.random()*.35)
+ );
+
+ const startX=target.x+(Math.random()-.5)*60;
+
+ rockets.push({
+  x:startX,
+  y:(H-camera.y)/camera.zoom+30,
+  vx:(Math.random()-.5)*.5,
+  vy:-(7+Math.random()*2),
+  targetY:target.y,
+  trail:[]
+ });
+}
+
+function getShape(){
+ return shape==="random"
+ ? ["sphere","ring","double","star","spiral","heart","chrysanthemum"][Math.floor(Math.random()*7)]
+ :shape;
+}
+
+function direction(s,i,n){
+ const t=i/n;
+ const a=t*Math.PI*2;
+ const x=Math.cos(a),y=Math.sin(a);
+
+ if(s==="star"){
+  const r=Math.floor(t*10)%2===0?1:.35;
+  return [x*r,y*r];
+ }
+ if(s==="spiral"){
+  return [Math.cos(a+t*12),Math.sin(a+t*12)];
+ }
+ if(s==="heart"){
+  const z=t*Math.PI*2;
+  return [
+   16*Math.pow(Math.sin(z),3)/18,
+   -(13*Math.cos(z)-5*Math.cos(2*z)-2*Math.cos(3*z)-Math.cos(4*z))/18
+  ];
+ }
+ if(s==="sphere"||s==="chrysanthemum"){
+  const z=Math.random()*2-1;
+  const a2=Math.random()*Math.PI*2;
+  return [Math.sqrt(1-z*z)*Math.cos(a2),z];
+ }
+ return [x,y];
+}
+
+function explode(x,y){
+ bursts++;
+ document.getElementById("stats").textContent="BURSTS: "+bursts;
+
+ const s=getShape();
+ const n=Math.min(amount,MAX_PARTICLES-particles.length);
+ if(n<=0)return;
+
+ for(let i=0;i<n;i++){
+  const d=direction(s,i,n);
+  let speed=2.5+Math.random()*3;
+
+  if(s==="ring")speed=4.2+Math.random()*.5;
+  if(s==="double")speed=i%2===0?5:2.5;
+  if(s==="chrysanthemum")speed=3+Math.random()*3;
+
+  particles.push({
+   x,y,
+   vx:d[0]*speed*size,
+   vy:d[1]*speed*size,
+   life:1,
+   decay:.006+Math.random()*.009,
+   color:randomColor(),
+   radius:mode==="particle"?1.5:1.8,
+   gravity:gravity*.055,
+   glow:Math.random()>.78
+  });
+ }
+
+ particles.push({
+  x,y,vx:0,vy:0,life:1,decay:.12,
+  color:"#ffffff",radius:12,gravity:0,flash:true
+ });
+}
+
+// Camera transformation and rendering
+function render(){
+ requestAnimationFrame(render);
+
+ ctx.setTransform(D,0,0,D,0,0);
+ ctx.fillStyle="#050713";
+ ctx.fillRect(0,0,W,H);
+
+ // World camera
+ ctx.setTransform(
+  D*camera.zoom,0,0,D*camera.zoom,
+  D*camera.x,D*camera.y
+ );
+
+ // Background
+ ctx.fillStyle="#080d20";
+ ctx.fillRect(
+  (-camera.x)/camera.zoom-500,
+  (-camera.y)/camera.zoom-500,
+  W/camera.zoom+1000,
+  H/camera.zoom+1000
+ );
+
+ for(const s of stars){
+  ctx.fillStyle="rgba(190,205,255,.55)";
+  ctx.fillRect(s.x,s.y,s.r,s.r);
+ }
+
+ // Rockets
+ for(let i=rockets.length-1;i>=0;i--){
+  const r=rockets[i];
+
+  r.trail.push({x:r.x,y:r.y});
+  if(r.trail.length>6)r.trail.shift();
+
+  r.x+=r.vx;
+  r.y+=r.vy;
+  r.vy+=.04;
+
+  r.trail.forEach((p,j)=>{
+   ctx.globalAlpha=j/r.trail.length;
+   ctx.fillStyle=colors[j%colors.length];
+   ctx.fillRect(p.x,p.y,2,3);
+  });
+
+  ctx.globalAlpha=1;
+  ctx.fillStyle="#ffffff";
+  ctx.fillRect(r.x-2,r.y-2,4,4);
+
+  if(r.y<=r.targetY||r.vy>=0){
+   explode(r.x,r.y);
+   rockets.splice(i,1);
+  }
+ }
+
+ // Particles
+ for(let i=particles.length-1;i>=0;i--){
+  const p=particles[i];
+
+  p.x+=p.vx;
+  p.y+=p.vy;
+  p.vy+=p.gravity;
+  p.vx*=.994;
+  p.vy*=.994;
+  p.life-=p.decay;
+
+  if(p.life<=0){
+   particles.splice(i,1);
+   continue;
+  }
+
+  ctx.globalAlpha=p.life;
+  ctx.fillStyle=p.color;
+
+  if(p.glow&&mode==="realistic"){
+   ctx.globalAlpha=p.life*.2;
+   ctx.fillRect(p.x-2,p.y-2,5,5);
+   ctx.globalAlpha=p.life;
+  }
+
+  if(p.flash){
+   ctx.globalAlpha=p.life*.5;
+   ctx.fillStyle="#ffffff";
+  }
+
+  const r=p.flash?p.radius*p.life:p.radius;
+  ctx.fillRect(p.x-r/2,p.y-r/2,r,r);
+ }
+
+ ctx.globalAlpha=1;
+
+ // Safety limit
+ if(particles.length>MAX_PARTICLES){
+  particles.splice(0,particles.length-MAX_PARTICLES);
+ }
+
+ ctx.setTransform(D,0,0,D,0,0);
+}
+render();
+
+// TOUCH NAVIGATION
+function distance(a,b){
+ return Math.hypot(a.x-b.x,a.y-b.y);
+}
+
+function midpoint(a,b){
+ return {x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+}
+
+function getTwo(){
+ return [...pointers.values()].slice(0,2);
+}
+
+canvas.addEventListener("pointerdown",e=>{
+ canvas.setPointerCapture(e.pointerId);
+
+ pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+ if(pointers.size===1){
+  gesture={
+   type:"pan",
+   startX:e.clientX,
+   startY:e.clientY,
+   lastX:e.clientX,
+   lastY:e.clientY
+  };
+ }else if(pointers.size===2){
+  const [a,b]=getTwo();
+  gesture={
+   type:"pinch",
+   distance:distance(a,b),
+   zoom:camera.zoom,
+   mid:midpoint(a,b),
+   world:worldPoint(
+    midpoint(a,b).x,
+    midpoint(a,b).y
+   )
+  };
+ }
+ moved=false;
+});
+
+canvas.addEventListener("pointermove",e=>{
+ if(!pointers.has(e.pointerId))return;
+
+ pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+ if(pointers.size===1&&gesture?.type==="pan"){
+  const p=pointers.get(e.pointerId);
+  const dx=p.x-gesture.lastX;
+  const dy=p.y-gesture.lastY;
+
+  if(Math.hypot(p.x-gesture.startX,p.y-gesture.startY)>7){
+   moved=true;
+  }
+
+  if(moved){
+   camera.x+=dx;
+   camera.y+=dy;
+  }
+
+  gesture.lastX=p.x;
+  gesture.lastY=p.y;
+ }
+
+ if(pointers.size===2&&gesture?.type==="pinch"){
+  const [a,b]=getTwo();
+  const mid=midpoint(a,b);
+  const d=distance(a,b);
+
+  const nextZoom=Math.max(.55,Math.min(2.8,
+   gesture.zoom*d/Math.max(gesture.distance,1)
+  ));
+
+  camera.zoom=nextZoom;
+  camera.x=mid.x-gesture.world.x*nextZoom;
+  camera.y=mid.y-gesture.world.y*nextZoom;
+
+  moved=true;
+  document.getElementById("zoomInfo").textContent=
+   "ZOOM: "+Math.round(camera.zoom*100)+"%";
+ }
+});
+
+function endPointer(e){
+ if(!pointers.has(e.pointerId))return;
+
+ const p=pointers.get(e.pointerId);
+ const wasTap=pointers.size===1&&!moved&&gesture?.type==="pan";
+
+ if(wasTap){
+  launch(p.x,p.y);
+ }
+
+ pointers.delete(e.pointerId);
+
+ if(pointers.size===0){
+  gesture=null;
+  moved=false;
+ }else if(pointers.size===1){
+  const remaining=[...pointers.values()][0];
+  gesture={
+   type:"pan",
+   startX:remaining.x,
+   startY:remaining.y,
+   lastX:remaining.x,
+   lastY:remaining.y
+  };
+  moved=true;
+ }
+}
+
+canvas.addEventListener("pointerup",endPointer);
+canvas.addEventListener("pointercancel",endPointer);
+canvas.addEventListener("contextmenu",e=>e.preventDefault());
+
+// UI
+document.getElementById("menuButton").onclick=()=>{
+ document.getElementById("panel").classList.toggle("closed");
+ document.getElementById("menuButton").textContent=
+ document.getElementById("panel").classList.contains("closed")
+ ?"⚙ SETTINGS":"✕ CLOSE";
+};
+
+document.getElementById("real").onclick=()=>{
+ mode="realistic";
+ setMode();
+};
+
+document.getElementById("digital").onclick=()=>{
+ mode="particle";
+ setMode();
+};
+
+function setMode(){
+ document.getElementById("real").classList.toggle("active",mode==="realistic");
+ document.getElementById("digital").classList.toggle("active",mode==="particle");
+}
+
+document.querySelectorAll("[data-shape]").forEach(b=>{
+ b.onclick=()=>{
+  shape=b.dataset.shape;
+  document.querySelectorAll("[data-shape]").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+ };
+});
+
+document.querySelectorAll("[data-grad]").forEach(b=>{
+ b.onclick=()=>{
+  gradientCount=Number(b.dataset.grad);
+  document.querySelectorAll("[data-grad]").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+ };
+});
+
+document.getElementById("apply").onclick=()=>{
+ colors=[];
+ for(let i=1;i<=gradientCount;i++){
+  colors.push(document.getElementById("c"+i).value);
+ }
+ document.querySelectorAll(".preset").forEach(x=>x.classList.remove("active"));
+};
+
+document.getElementById("size").oninput=e=>{
+ size=e.target.value/100;
+ document.getElementById("sv").textContent=e.target.value+"%";
+};
+
+document.getElementById("count").oninput=e=>{
+ amount=Number(e.target.value);
+ document.getElementById("cv").textContent=amount;
+};
+
+document.getElementById("gravity").oninput=e=>{
+ gravity=e.target.value/100;
+ document.getElementById("gv").textContent=e.target.value+"%";
+};
+
+document.getElementById("launch").onclick=()=>launch();
+
+document.getElementById("auto").onclick=e=>{
+ auto=!auto;
+ e.target.textContent="AUTO: "+(auto?"ON":"OFF");
+ e.target.classList.toggle("active",auto);
+};
+
+document.getElementById("clear").onclick=()=>{
+ particles=[];
+ rockets=[];
+ bursts=0;
+ document.getElementById("stats").textContent="BURSTS: 0";
+};
+
+setInterval(()=>{
+ if(auto&&rockets.length<3)launch();
+},1200);
+</script>
+</body>
+</html>
